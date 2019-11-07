@@ -85,7 +85,7 @@ class populateDatabase:
             print(e)
 
 
-    def batchMergeFaaGenomeFromCSV(self, faaGenomeCsvFileName, organismTaxonomyID, ):
+    def MergeFaaGenomeFromCSV(self, faaGenomeCsvFileName, organismTaxonomyID):
 
         # THE CSV FILE MUST BE IN THE neo4j/import directory of the docker in the server
 
@@ -111,8 +111,8 @@ class populateDatabase:
                 "MERGE (gid)-[:GENE_IDENTIFIER_IN_GENOME_VERSION]->(g) " \
                 "MERGE (prod)-[:PRODUCT_IN_GENOME_VERSION]->(g) " \
                 "MERGE (seq)-[:SEQUENCE_IN_GENOME_VERSION]->(g) " \
-                "MERGE (prod)-[:GENE_IDENTIFIER_HAS_PRODUCT]->(gid) " \
-                "MERGE (seq)-[:GENE_IDENTIFIER_HAS_SEQUENCE]->(gid) "
+                "MERGE (prod)<-[:GENE_IDENTIFIER_HAS_PRODUCT]-(gid) " \
+                "MERGE (seq)<-[:GENE_IDENTIFIER_HAS_SEQUENCE]-(gid) "
 
 
         queryProperties = {"version":faaGenomeCsvFileName.replace(".csv",""), "taxid":str(organismTaxonomyID), "timestamp":timestamp}
@@ -123,6 +123,52 @@ class populateDatabase:
         session.run(query, queryProperties)
 
         # the query auto commits, it is not necessary to close the session
+
+
+    def ConnectGenesWithSameSequenceFromCSV(self, csvFileName):
+
+        # THE CSV FILE MUST BE IN THE neo4j/import directory of the docker in the server
+
+        driver = neo4jPythonDriver(crd.URI, crd.USER_NAME, crd.PASSWORD)
+        session = driver.initSession()
+
+
+        query = "USING PERIODIC COMMIT 1000 " \
+                "LOAD CSV WITH HEADERS FROM 'file:///" + csvFileName +"' " \
+                "AS row WITH row " \
+                "MATCH (g1:GeneIdentifier) where ID(g1) = toInt(row.ID1) " \
+                "MATCH (g2:GeneIdentifier) where ID(g2) = toInt(row.ID2) " \
+                "MERGE (g1)-[:GENES_SHARE_SEQUENCE {SameGenome:False}]->(g2)" \
+                "MERGE (g1)<-[:GENES_SHARE_SEQUENCE {SameGenome:False}]-(g2)"
+
+        session.run(query)
+
+        # the query auto commits, it is not necessary to close the session
+
+
+
+    def SetGenesWithSameSequenceAndSameGenome(self):
+
+        # THE CSV FILE MUST BE IN THE neo4j/import directory of the docker in the server
+
+        driver = neo4jPythonDriver(crd.URI, crd.USER_NAME, crd.PASSWORD)
+        session = driver.initSession()
+
+
+        query = "MATCH (v1:GenomeVersion)-[]-(g1:GeneIdentifier)-[r:GENES_SHARE_SEQUENCE]->(g2:GeneIdentifier)-[]-(v2:GenomeVersion) " \
+                "WHERE v1 = v2 " \
+                "WITH distinct(g1) as gene1, g2 as gene2, r as rel " \
+                "SET rel.SameGenome = True"
+
+        session.run(query)
+        session.close()
+
+
+
+
+
+
+
 
 
 

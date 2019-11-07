@@ -5,13 +5,13 @@ import credentials
 def test1():
 
     driver = neo4jPythonDriver(credentials.URI, credentials.USER_NAME, credentials.PASSWORD)
-    session = driver.getSession()
+    session = driver.initSession()
 
-    allNodes = session.runNeo4jSession("match (n) WHERE n.age = {age} return n", {"age":24})
-    session.closeNeo4jSession()
+    allNodes = session.run("match (s:Sequence) WHERE s.Sequence STARTS WITH({seq}) return s", {"seq":"MRVN"})
+    session.close()
 
     for node in allNodes:
-        print(node)
+        print(node["s"]["Sequence"])
 
 
 
